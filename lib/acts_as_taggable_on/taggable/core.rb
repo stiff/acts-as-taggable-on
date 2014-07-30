@@ -141,21 +141,21 @@ module ActsAsTaggableOn::Taggable
               "#{alias_base_name[0..4]}#{taggings_context[0..6]}_taggings_#{ActsAsTaggableOn::Utils.sha_prefix(tags.map(&:name).join('_'))}"
           )
 
-          tagging_join = "JOIN #{ActsAsTaggableOn::Tagging.table_name} #{taggings_alias}" +
-                          "  ON #{taggings_alias}.taggable_id = #{quote}#{table_name}#{quote}.#{primary_key}" +
+          tagging_cond = "SELECT 1 FROM #{ActsAsTaggableOn::Tagging.table_name} #{taggings_alias}" +
+                          " WHERE #{taggings_alias}.taggable_id = #{quote}#{table_name}#{quote}.#{primary_key}" +
                           " AND #{taggings_alias}.taggable_type = #{quote_value(base_class.name, nil)}"
 
-          tagging_join << " AND " + sanitize_sql(["#{taggings_alias}.created_at >= ?", options.delete(:start_at)]) if options[:start_at]
-          tagging_join << " AND " + sanitize_sql(["#{taggings_alias}.created_at <= ?", options.delete(:end_at)])   if options[:end_at]
+          tagging_cond << " AND " + sanitize_sql(["#{taggings_alias}.created_at >= ?", options.delete(:start_at)]) if options[:start_at]
+          tagging_cond << " AND " + sanitize_sql(["#{taggings_alias}.created_at <= ?", options.delete(:end_at)])   if options[:end_at]
 
-          tagging_join << " AND " + sanitize_sql(["#{taggings_alias}.context = ?", context.to_s]) if context
+          tagging_cond << " AND " + sanitize_sql(["#{taggings_alias}.context = ?", context.to_s]) if context
 
           # don't need to sanitize sql, map all ids and join with OR logic
-          conditions << tags.map { |t| "#{taggings_alias}.tag_id = #{quote_value(t.id, nil)}" }.join(' OR ')
+          tagging_cond << ' AND ' + tags.map { |t| "#{taggings_alias}.tag_id = #{quote_value(t.id, nil)}" }.join(' OR ')
           select_clause << " #{table_name}.*" unless context and tag_types.one?
 
           if owned_by
-            tagging_join << ' AND ' +
+            tagging_cond << ' AND ' +
                 sanitize_sql([
                                  "#{taggings_alias}.tagger_id = ? AND #{taggings_alias}.tagger_type = ?",
                                  owned_by.id,
@@ -163,11 +163,7 @@ module ActsAsTaggableOn::Taggable
                              ])
           end
 
-          joins << tagging_join
-          unless any == 'distinct' # Fix issue #544
-            group = "#{table_name}.#{primary_key}"
-            select_clause << group
-          end
+          conditions << "EXISTS (#{tagging_cond})"
         else
           tags = ActsAsTaggableOn::Tag.named_any(tag_list)
 
