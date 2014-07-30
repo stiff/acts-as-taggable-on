@@ -100,6 +100,7 @@ module ActsAsTaggableOn::Taggable
         context = options.delete(:on)
         owned_by = options.delete(:owned_by)
         alias_base_name = undecorated_table_name.gsub('.', '_')
+        # FIXME use ActiveRecord's connection quote_column_name
         quote = ActsAsTaggableOn::Utils.using_postgresql? ? '"' : ''
 
         if options.delete(:exclude)
@@ -117,7 +118,7 @@ module ActsAsTaggableOn::Taggable
                       " AND #{ActsAsTaggableOn::Tagging.table_name}.taggable_type = #{quote_value(base_class.name, nil)}" +
                       " AND #{ActsAsTaggableOn::Tagging.table_name}.tagger_id = #{quote_value(owned_by.id, nil)}" +
                       " AND #{ActsAsTaggableOn::Tagging.table_name}.tagger_type = #{quote_value(owned_by.class.base_class.to_s, nil)}"
-            
+
             joins << " AND " + sanitize_sql(["#{ActsAsTaggableOn::Tagging.table_name}.created_at >= ?", options.delete(:start_at)]) if options[:start_at]
             joins << " AND " + sanitize_sql(["#{ActsAsTaggableOn::Tagging.table_name}.created_at <= ?", options.delete(:end_at)])   if options[:end_at]
           end
@@ -130,7 +131,7 @@ module ActsAsTaggableOn::Taggable
                    ActsAsTaggableOn::Tag.named_any(tag_list)
                  end
 
-          return empty_result unless tags.length > 0
+          return empty_result if tags.length == 0
 
           # setup taggings alias so we can chain, ex: items_locations_taggings_awesome_cool_123
           # avoid ambiguous column name
@@ -224,11 +225,11 @@ module ActsAsTaggableOn::Taggable
         query = self
         query = self.select(select_clause.join(',')) unless select_clause.empty?
         query.joins(joins.join(' '))
-        .where(conditions.join(' AND '))
-        .group(group)
-        .having(having)
-        .order(order_by.join(', '))
-        .readonly(false)
+          .where(conditions.join(' AND '))
+          .group(group)
+          .having(having)
+          .order(order_by.join(', '))
+          .readonly(false)
       end
 
       def is_taggable?
