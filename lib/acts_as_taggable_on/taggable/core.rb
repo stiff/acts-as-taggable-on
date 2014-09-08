@@ -141,7 +141,9 @@ module ActsAsTaggableOn::Taggable
               "#{alias_base_name[0..4]}#{taggings_context[0..6]}_taggings_#{ActsAsTaggableOn::Utils.sha_prefix(tags.map(&:name).join('_'))}"
           )
 
-          tagging_cond = "SELECT 1 FROM #{ActsAsTaggableOn::Tagging.table_name} #{taggings_alias}" +
+          order_by_matching_tag_count = options.delete(:order_by_matching_tag_count)
+          tagging_cond = (order_by_matching_tag_count ? "SELECT count(*) " : "SELECT 1 ") +
+                          " FROM #{ActsAsTaggableOn::Tagging.table_name} #{taggings_alias}" +
                           " WHERE #{taggings_alias}.taggable_id = #{quote}#{table_name}#{quote}.#{primary_key}" +
                           " AND #{taggings_alias}.taggable_type = #{quote_value(base_class.name, nil)}"
 
@@ -164,7 +166,13 @@ module ActsAsTaggableOn::Taggable
                              ])
           end
 
-          conditions << "EXISTS (#{tagging_cond})"
+          if order_by_matching_tag_count
+            select_clause << "(#{tagging_cond}) as #{alias_base_name}_tags_count"
+            conditions << "#{alias_base_name}_tags_count > 0"
+            order_by << "#{alias_base_name}_tags_count desc"
+          else
+            conditions << "EXISTS (#{tagging_cond})"
+          end
         else
           tags = ActsAsTaggableOn::Tag.named_any(tag_list)
 
@@ -197,7 +205,7 @@ module ActsAsTaggableOn::Taggable
 
         group ||= [] # Rails interprets this as a no-op in the group() call below
         if options.delete(:order_by_matching_tag_count)
-          select_clause << "#{table_name}.*, COUNT(#{taggings_alias}.tag_id) AS #{taggings_alias}_count"
+          select_clause << "#{table_name}.*, COUNT(#{taggings_alias}.tag_id) AS #{taggings_alias}_tags_count"
           group_columns = ActsAsTaggableOn::Utils.using_postgresql? ? grouped_column_names_for(self) : "#{table_name}.#{primary_key}"
           group = group_columns
           order_by << "#{taggings_alias}_count DESC"
