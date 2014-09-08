@@ -167,9 +167,9 @@ module ActsAsTaggableOn::Taggable
           end
 
           if order_by_matching_tag_count
-            select_clause << "(#{tagging_cond}) as #{alias_base_name}_tags_count"
-            conditions << "#{alias_base_name}_tags_count > 0"
-            order_by << "#{alias_base_name}_tags_count desc"
+            select_clause << "(#{tagging_cond}) as #{taggings_alias}_count"
+            conditions << "#{taggings_alias}_count > 0"
+            order_by << "#{taggings_alias}_count desc"
           else
             conditions << "EXISTS (#{tagging_cond})"
           end
@@ -205,10 +205,10 @@ module ActsAsTaggableOn::Taggable
 
         group ||= [] # Rails interprets this as a no-op in the group() call below
         if options.delete(:order_by_matching_tag_count)
-          select_clause << "#{table_name}.*, COUNT(#{taggings_alias}.tag_id) AS #{taggings_alias}_tags_count"
+          select_clause << "#{table_name}.*, COUNT(#{taggings_alias}.tag_id) AS #{taggings_alias}_count"
           group_columns = ActsAsTaggableOn::Utils.using_postgresql? ? grouped_column_names_for(self) : "#{table_name}.#{primary_key}"
           group = group_columns
-          order_by << "#{taggings_alias}_tags_count DESC"
+          order_by << "#{taggings_alias}_count DESC"
 
         elsif options.delete(:match_all)
           taggings_alias, _ = adjust_taggings_alias("#{alias_base_name}_taggings_group"), "#{alias_base_name}_tags_group"
