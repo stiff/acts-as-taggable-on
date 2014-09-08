@@ -141,9 +141,7 @@ module ActsAsTaggableOn::Taggable
               "#{alias_base_name[0..4]}#{taggings_context[0..6]}_taggings_#{ActsAsTaggableOn::Utils.sha_prefix(tags.map(&:name).join('_'))}"
           )
 
-          order_by_matching_tag_count = options.delete(:order_by_matching_tag_count)
-          tagging_cond = (order_by_matching_tag_count ? "SELECT count(*) " : "SELECT 1 ") +
-                          " FROM #{ActsAsTaggableOn::Tagging.table_name} #{taggings_alias}" +
+          tagging_cond = "#{ActsAsTaggableOn::Tagging.table_name} #{taggings_alias}" +
                           " WHERE #{taggings_alias}.taggable_id = #{quote}#{table_name}#{quote}.#{primary_key}" +
                           " AND #{taggings_alias}.taggable_type = #{quote_value(base_class.name, nil)}"
 
@@ -166,12 +164,9 @@ module ActsAsTaggableOn::Taggable
                              ])
           end
 
-          if order_by_matching_tag_count
-            select_clause << "(#{tagging_cond}) as #{taggings_alias}_count"
-            conditions << "#{taggings_alias}_count > 0"
-            order_by << "#{taggings_alias}_count desc"
-          else
-            conditions << "EXISTS (#{tagging_cond})"
+          conditions << "EXISTS (SELECT 1 FROM #{tagging_cond})"
+          if options.delete(:order_by_matching_tag_count)
+            order_by << "(SELECT count(*) FROM #{tagging_cond}) desc"
           end
         else
           tags = ActsAsTaggableOn::Tag.named_any(tag_list)
