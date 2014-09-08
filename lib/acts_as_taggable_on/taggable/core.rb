@@ -208,7 +208,7 @@ module ActsAsTaggableOn::Taggable
           select_clause << "#{table_name}.*, COUNT(#{taggings_alias}.tag_id) AS #{taggings_alias}_tags_count"
           group_columns = ActsAsTaggableOn::Utils.using_postgresql? ? grouped_column_names_for(self) : "#{table_name}.#{primary_key}"
           group = group_columns
-          order_by << "#{taggings_alias}_count DESC"
+          order_by << "#{taggings_alias}_tags_count DESC"
 
         elsif options.delete(:match_all)
           taggings_alias, _ = adjust_taggings_alias("#{alias_base_name}_taggings_group"), "#{alias_base_name}_tags_group"
